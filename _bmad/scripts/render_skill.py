@@ -144,8 +144,14 @@ def _resolve_short_config(
     if not matches:
         raise RenderError(f"missing config value `{key}`")
     if len(matches) > 1:
-        paths = ", ".join(path for path, _ in matches)
-        raise RenderError(f"ambiguous config value `{key}` found at: {paths}")
+        # LOCAL PATCH: treat matches that all agree on the same value as non-ambiguous.
+        # BMad modules (bmm, gds, …) can legitimately register identical path values for
+        # cross-module conveniences; the strict-first-match semantics would HALT those.
+        # See _bmad/scripts/PATCH_NOTES.md for restoration if a BMad update overwrites this.
+        distinct_values = {value for _, value in matches}
+        if len(distinct_values) > 1:
+            paths = ", ".join(path for path, _ in matches)
+            raise RenderError(f"ambiguous config value `{key}` found at: {paths}")
     path, value = matches[0]
     return path, _resolve_config_value(value, f"config.{path}", project_root)
 
