@@ -1,0 +1,28 @@
+# Secrets
+.env
+
+# H2 artefacts (if anyone runs dev mode next to the jar)
+*.mv.db
+*.trace.db
+
+# Backend build outputs
+backend/target/
+backend/.mvn/
+backend/HELP.md
+backend/mvnw.cmd.bak
+
+# Frontend build outputs
+frontend/dist/
+frontend/node_modules/
+frontend/.angular/
+frontend/.nx/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

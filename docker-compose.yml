@@ -1,0 +1,54 @@
+# Docker Compose orchestrator — AD-15.
+# Two services (backend + frontend), one named volume for H2 persistence,
+# depends_on with a backend healthcheck so the frontend never beats the API up.
+#
+# Primary entry points:
+#   .\start-windows.ps1  (Windows PowerShell — primary)
+#   start.bat            (Windows double-click wrapper)
+#   ./start.sh           (Mac / Linux)
+#
+# Reach into docker directly if you prefer:
+#   docker compose up -d --build
+#   docker compose down            # preserves the kanban-data volume
+#   docker compose down -v         # destroys it (equivalent to stop-windows.ps1 -Purge)
+
+name: kanban
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: kanban-backend
+    image: kanban-backend:dev
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: container
+      # Pass through from .env (file is gitignored; see .env.example).
+      # Optional per AD-6 — the app runs AI-disabled when this is empty.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - kanban-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: kanban-frontend
+    image: kanban-frontend:dev
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kanban-data:
+    name: kanban-data
