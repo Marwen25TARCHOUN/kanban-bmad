@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Preview Modal — Local AI Kanban</title>
+<meta name="description" content="AI breakdown preview modal — climax surface. Token-faithful to DESIGN.md; pencil visible at rest.">
+<style>
+  :root {
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --text-primary: #09090B;
+    --text-secondary: #52525B;
+    --text-tertiary: #71717A;
+    --border-default: #E4E4E7;
+    --border-strong: #71717A;
+    --accent-500: #4F46E5;
+    --accent-600: #4338CA;
+    --accent-700: #3730A3;
+    --accent-100: #E0E7FF;
+    --priority-low: #475569;
+    --priority-low-bg: #F1F5F9;
+    --priority-medium: #92400E;
+    --priority-medium-bg: #FEF3C7;
+    --priority-high: #B91C1C;
+    --priority-high-bg: #FEE2E2;
+    --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg-page);
+    color: var(--text-primary);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Faint board behind the backdrop — backdrop already blurs, so these are structural placeholders only */
+  .board-behind {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 24px 32px;
+  }
+  .column {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .column-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  /* Backdrop */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 9, 11, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .backdrop { backdrop-filter: none; }
+  }
+
+  /* Modal */
+  .modal {
+    background: var(--bg-surface);
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 20px 40px -8px rgba(0,0,0,0.12), 0 8px 16px -4px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .modal-title .idea {
+    font-weight: 400;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Checkbox wrapper — 24×24 touch target around 16px glyph */
+  .cb-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .cb-wrap input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-500);
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .select-all-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-default);
+    min-height: 32px;
+  }
+
+  /* Preview rows */
+  .preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .preview-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+    padding: 10px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--bg-surface);
+  }
+  .preview-row:hover { background: var(--bg-subtle); }
+  .row-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .row-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .row-title[data-editable="true"]::after {
+    content: "✎";
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    margin-left: 4px;
+    opacity: 0.4;                          /* visible at rest — climax-beat affordance */
+    transition: opacity 0.15s;
+  }
+  .preview-row:hover .row-title[data-editable="true"]::after,
+  .preview-row:focus-within .row-title[data-editable="true"]::after { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .row-title[data-editable="true"]::after { transition: none; }
+  }
+  .row-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .priority-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    min-height: 24px;                      /* WCAG 2.5.8 AA */
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .priority-low { color: var(--priority-low); background: var(--priority-low-bg); }
+  .priority-medium { color: var(--priority-medium); background: var(--priority-medium-bg); }
+  .priority-high { color: var(--priority-high); background: var(--priority-high-bg); }
+
+  /* Actions */
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-default);
+  }
+  .btn {
+    padding: 8px 16px;
+    min-height: 32px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--bg-subtle); }
+  .btn-primary {
+    background: var(--accent-500);
+    color: white;
+    border-color: var(--accent-500);
+  }
+  .btn-primary:hover { background: var(--accent-600); }
+</style>
+</head>
+<body>
+
+<div class="board-behind" aria-hidden="true">
+  <div class="column"><div class="column-label">To Do · 0</div></div>
+  <div class="column"><div class="column-label">In Progress · 0</div></div>
+  <div class="column"><div class="column-label">Done · 0</div></div>
+</div>
+
+<div class="backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-title">
+      <span id="modal-title">Suggested breakdown</span>
+      <span class="idea" aria-label="Originating idea">"Deploy my app to Fly.io"</span>
+    </div>
+
+    <label class="select-all-row">
+      <span class="cb-wrap"><input type="checkbox" checked aria-label="Select all 5 suggestions"></span>
+      <span>Select all (5)</span>
+    </label>
+
+    <div class="preview-list" role="list">
+      <div class="preview-row" role="listitem">
+        <label class="cb-wrap"><input type="checkbox" checked aria-label="Include: Set up Fly.io account and CLI"></label>
+        <div class="row-body">
+          <div class="row-title" data-editable="true" tabindex="0" role="button" aria-label="Edit title: Set up Fly.io account and CLI">Set up Fly.io account and CLI</div>
+          <div class="row-desc">Create a Fly.io account, install the flyctl CLI, authenticate from the terminal, and verify access to the free tier.</div>
+        </div>
+        <span class="priority-chip priority-medium" aria-label="Priority: medium">Medium</span>
+      </div>
+
+      <div class="preview-row" role="listitem">
+        <label class="cb-wrap"><input type="checkbox" checked aria-label="Include: Write a Dockerfile for the app"></label>
+        <div class="row-body">
+          <div class="row-title" data-editable="true" tabindex="0" role="button" aria-label="Edit title: Write a Dockerfile for the app">Write a Dockerfile for the app</div>
+          <div class="row-desc">Multi-stage build, non-root user, slim base image. Include .dockerignore for secrets.</div>
+        </div>
+        <span class="priority-chip priority-high" aria-label="Priority: high">High</span>
+      </div>
+
+      <div class="preview-row" role="listitem">
+        <label class="cb-wrap"><input type="checkbox" checked aria-label="Include: Configure fly.toml"></label>
+        <div class="row-body">
+          <div class="row-title" data-editable="true" tabindex="0" role="button" aria-label="Edit title: Configure fly.toml">Configure fly.toml</div>
+          <div class="row-desc">Primary region, health checks, autoscaling rules, environment variables.</div>
+        </div>
+        <span class="priority-chip priority-medium" aria-label="Priority: medium">Medium</span>
+      </div>
+
+      <div class="preview-row" role="listitem">
+        <label class="cb-wrap"><input type="checkbox" aria-label="Include: Set up GitHub Actions deploy"></label>
+        <div class="row-body">
+          <div class="row-title" data-editable="true" tabindex="0" role="button" aria-label="Edit title: Set up GitHub Actions deploy">Set up GitHub Actions deploy</div>
+          <div class="row-desc">Workflow that builds on push to main, deploys via flyctl, requires a FLY_API_TOKEN secret.</div>
+        </div>
+        <span class="priority-chip priority-low" aria-label="Priority: low">Low</span>
+      </div>
+
+      <div class="preview-row" role="listitem">
+        <label class="cb-wrap"><input type="checkbox" checked aria-label="Include: Test deploy and rollback"></label>
+        <div class="row-body">
+          <div class="row-title" data-editable="true" tabindex="0" role="button" aria-label="Edit title: Test deploy and rollback">Test deploy and rollback</div>
+          <div class="row-desc">Deploy to Fly.io, verify the app responds, trigger a rollback to confirm the pipeline reverses cleanly.</div>
+        </div>
+        <span class="priority-chip priority-medium" aria-label="Priority: medium">Medium</span>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" type="button">Cancel</button>
+      <button class="btn btn-primary" type="button">Accept selected</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

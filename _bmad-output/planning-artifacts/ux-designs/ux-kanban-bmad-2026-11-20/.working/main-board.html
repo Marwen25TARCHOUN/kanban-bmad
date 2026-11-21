@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Main Board (Light + Dark) — Local AI Kanban</title>
+<style>
+  /* Shared tokens */
+  :root {
+    --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+    --accent-500: #6366F1;
+    --accent-600: #4F46E5;
+    --accent-100: #E0E7FF;
+    --accent-700: #4338CA;
+    --priority-low: #64748B;
+    --priority-low-bg: #F1F5F9;
+    --priority-medium: #F59E0B;
+    --priority-medium-bg: #FEF3C7;
+    --priority-high: #EF4444;
+    --priority-high-bg: #FEE2E2;
+  }
+  .theme-light {
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --text-primary: #09090B;
+    --text-secondary: #52525B;
+    --text-tertiary: #A1A1AA;
+    --border-default: #E4E4E7;
+    --border-strong: #D4D4D8;
+  }
+  .theme-dark {
+    --bg-page: #09090B;
+    --bg-surface: #18181B;
+    --bg-subtle: #27272A;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #71717A;
+    --border-default: #27272A;
+    --border-strong: #3F3F46;
+    --priority-low-bg: #1E293B;
+    --priority-medium-bg: #422006;
+    --priority-high-bg: #450A0A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: #71717A;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    min-height: 100vh;
+  }
+  body::before {
+    content: "Side-by-side: light mode (left) and dark mode (right). Same board state.";
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: white;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 4px;
+    z-index: 100;
+  }
+
+  /* App shell per theme */
+  .app {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 720px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+    gap: 16px;
+  }
+  .brand {
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .ai-bar {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    max-width: 480px;
+  }
+  .ai-input {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+  }
+  .ai-input::placeholder { color: var(--text-tertiary); }
+  .ai-btn {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.75rem;
+  }
+  .segmented button {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: inherit;
+  }
+  .segmented button.active {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  /* Board */
+  .board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .column {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 4px 6px;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .column-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .column-count {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+  }
+  .quick-add {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px dashed var(--border-strong);
+    cursor: pointer;
+    text-align: center;
+  }
+  .quick-add:hover { color: var(--text-secondary); border-color: var(--text-tertiary); }
+
+  /* Card */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .card-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+  }
+  .ai-badge {
+    background: var(--accent-100);
+    color: var(--accent-700);
+    border-radius: 9999px;
+    padding: 1px 6px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .theme-dark .ai-badge {
+    background: rgba(99,102,241,0.2);
+    color: #A5B4FC;
+  }
+  .card-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2px;
+  }
+  .priority-chip {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .priority-low { color: var(--priority-low); background: var(--priority-low-bg); }
+  .priority-medium { color: var(--priority-medium); background: var(--priority-medium-bg); }
+  .priority-high { color: var(--priority-high); background: var(--priority-high-bg); }
+  .card-time {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+  }
+</style>
+</head>
+<body>
+
+<!-- LIGHT MODE -->
+<div class="app theme-light">
+  <header class="header">
+    <div class="brand">✨ Local AI Kanban</div>
+    <div class="ai-bar">
+      <input class="ai-input" placeholder="Describe what you want to break down…">
+      <button class="ai-btn">✨ Break down with AI</button>
+    </div>
+    <div class="header-right">
+      <div class="segmented"><button>FR</button><button class="active">EN</button></div>
+      <button class="icon-btn" title="Toggle dark mode">🌙</button>
+    </div>
+  </header>
+  <div class="board">
+    <section class="column">
+      <div class="column-header"><span class="column-label">To Do</span><span class="column-count">4</span></div>
+      <div class="quick-add">+ Add a task…</div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Set up Fly.io account and CLI</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Create a Fly.io account, install the flyctl CLI, authenticate from the terminal, and verify access to the free tier.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Write Dockerfile + .dockerignore</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Multi-stage build, non-root user, slim base image. Include .dockerignore to keep node_modules and secrets out of context.</p>
+        <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Configure fly.toml</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Primary region, health checks, autoscaling rules, environment variables.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Test deploy and rollback</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Deploy to Fly.io, verify the app responds, trigger a rollback to confirm the pipeline reverses cleanly.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+    </section>
+    <section class="column">
+      <div class="column-header"><span class="column-label">In Progress</span><span class="column-count">1</span></div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Refactor auth middleware</span></div>
+        <p class="card-desc">Extract the token validation from the controller into a dedicated filter. Covered by the new unit test.</p>
+        <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">2h ago</span></div>
+      </article>
+    </section>
+    <section class="column">
+      <div class="column-header"><span class="column-label">Done</span><span class="column-count">1</span></div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Set up repo and CI</span></div>
+        <p class="card-desc">Created the repo, pushed first commit, GitHub Actions running on push.</p>
+        <div class="card-meta"><span class="priority-chip priority-low">Low</span><span class="card-time">1d ago</span></div>
+      </article>
+    </section>
+  </div>
+</div>
+
+<!-- DARK MODE -->
+<div class="app theme-dark">
+  <header class="header">
+    <div class="brand">✨ Local AI Kanban</div>
+    <div class="ai-bar">
+      <input class="ai-input" placeholder="Describe what you want to break down…">
+      <button class="ai-btn">✨ Break down with AI</button>
+    </div>
+    <div class="header-right">
+      <div class="segmented"><button>FR</button><button class="active">EN</button></div>
+      <button class="icon-btn" title="Toggle light mode">☀️</button>
+    </div>
+  </header>
+  <div class="board">
+    <section class="column">
+      <div class="column-header"><span class="column-label">To Do</span><span class="column-count">4</span></div>
+      <div class="quick-add">+ Add a task…</div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Set up Fly.io account and CLI</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Create a Fly.io account, install the flyctl CLI, authenticate from the terminal, and verify access to the free tier.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Write Dockerfile + .dockerignore</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Multi-stage build, non-root user, slim base image. Include .dockerignore to keep node_modules and secrets out of context.</p>
+        <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Configure fly.toml</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Primary region, health checks, autoscaling rules, environment variables.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Test deploy and rollback</span><span class="ai-badge">✨</span></div>
+        <p class="card-desc">Deploy to Fly.io, verify the app responds, trigger a rollback to confirm the pipeline reverses cleanly.</p>
+        <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+      </article>
+    </section>
+    <section class="column">
+      <div class="column-header"><span class="column-label">In Progress</span><span class="column-count">1</span></div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Refactor auth middleware</span></div>
+        <p class="card-desc">Extract the token validation from the controller into a dedicated filter. Covered by the new unit test.</p>
+        <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">2h ago</span></div>
+      </article>
+    </section>
+    <section class="column">
+      <div class="column-header"><span class="column-label">Done</span><span class="column-count">1</span></div>
+      <article class="card">
+        <div class="card-title-row"><span class="card-title">Set up repo and CI</span></div>
+        <p class="card-desc">Created the repo, pushed first commit, GitHub Actions running on push.</p>
+        <div class="card-meta"><span class="priority-chip priority-low">Low</span><span class="card-time">1d ago</span></div>
+      </article>
+    </section>
+  </div>
+</div>
+
+</body>
+</html>

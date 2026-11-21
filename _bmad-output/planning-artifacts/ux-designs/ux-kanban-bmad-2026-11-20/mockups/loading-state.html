@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Loading State — Local AI Kanban</title>
+<meta name="description" content="AI breakdown in flight: disabled input, button spinner, 'Thinking…' status line. Fills the 4–7s silence so the state cannot read as broken.">
+<style>
+  :root {
+    --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+    --accent-500: #4F46E5;
+    --accent-600: #4338CA;
+    --accent-100: #E0E7FF;
+    --dark-accent-bg: rgba(99,102,241,0.2);
+    --dark-accent-fg: #A5B4FC;
+  }
+  .theme-light {
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --text-primary: #09090B;
+    --text-secondary: #52525B;
+    --text-tertiary: #71717A;
+    --border-default: #E4E4E7;
+    --border-strong: #71717A;
+  }
+  .theme-dark {
+    --bg-page: #09090B;
+    --bg-surface: #18181B;
+    --bg-subtle: #27272A;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #A1A1AA;
+    --border-default: #3F3F46;
+    --border-strong: #71717A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: #71717A;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    min-height: 100vh;
+  }
+  body::before {
+    content: "AI request in flight: button disabled with spinner; status line below with aria-live=polite.";
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: white;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 4px;
+    z-index: 100;
+  }
+
+  .app {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 480px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+    gap: 16px;
+  }
+  .brand {
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-primary);
+  }
+  .ai-bar-wrap {
+    flex: 1;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ai-bar {
+    display: flex;
+    gap: 6px;
+  }
+  .ai-input {
+    flex: 1;
+    padding: 4px 8px;
+    min-height: 28px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+  .ai-btn {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    min-height: 28px;
+    min-width: 100px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: not-allowed;
+    opacity: 0.85;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; border-top-color: rgba(255,255,255,0.8); }
+  }
+  .status-line {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    padding-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-line::before {
+    content: "";
+    display: inline-block;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent-500);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) {
+    .status-line::before { animation: none; }
+  }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.8125rem;
+  }
+  .segmented button {
+    background: transparent;
+    border: none;
+    padding: 4px 10px;
+    min-height: 28px;
+    min-width: 32px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: inherit;
+  }
+  .segmented button.active {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  /* Faded board behind — showing context of a populated board mid-request */
+  .board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    gap: 16px;
+    padding: 16px;
+    opacity: 0.55;
+    filter: saturate(0.85);
+    pointer-events: none;
+  }
+  .column {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .column-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .card-ghost {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ghost-line {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border-default);
+  }
+  .ghost-line.short { width: 60%; }
+  .ghost-line.mid { width: 80%; }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- LIGHT MODE -->
+<div class="app theme-light">
+  <header class="header">
+    <div class="brand"><span aria-hidden="true">✨</span> Local AI Kanban</div>
+    <div class="ai-bar-wrap">
+      <div class="ai-bar" role="search">
+        <input class="ai-input" value="Deploy my app to Fly.io" disabled aria-label="Describe what you want to break down" aria-busy="true">
+        <button class="ai-btn" type="button" disabled aria-busy="true" aria-label="Generating cards">
+          <span class="spinner" aria-hidden="true"></span>
+          <span aria-hidden="true">Thinking</span>
+        </button>
+      </div>
+      <div class="status-line" role="status" aria-live="polite">Thinking…</div>
+    </div>
+    <div class="header-right">
+      <div class="segmented" role="group" aria-label="Language">
+        <button type="button" aria-label="Switch to French">FR</button>
+        <button type="button" class="active" aria-pressed="true" aria-label="Switch to English">EN</button>
+      </div>
+      <button class="icon-btn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span aria-hidden="true">🌙</span></button>
+    </div>
+  </header>
+  <div class="board" aria-hidden="true">
+    <section class="column">
+      <div class="column-label">To Do</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+      <div class="card-ghost"><div class="ghost-line"></div><div class="ghost-line short"></div></div>
+    </section>
+    <section class="column">
+      <div class="column-label">In Progress</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+    </section>
+    <section class="column">
+      <div class="column-label">Done</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+    </section>
+  </div>
+</div>
+
+<!-- DARK MODE (FR locale to show both toggles at once) -->
+<div class="app theme-dark" lang="fr">
+  <header class="header">
+    <div class="brand"><span aria-hidden="true">✨</span> Kanban IA local</div>
+    <div class="ai-bar-wrap">
+      <div class="ai-bar" role="search">
+        <input class="ai-input" value="Déployer mon appli sur Fly.io" disabled aria-label="Décrivez ce que vous voulez décomposer" aria-busy="true">
+        <button class="ai-btn" type="button" disabled aria-busy="true" aria-label="Génération des cartes en cours">
+          <span class="spinner" aria-hidden="true"></span>
+          <span aria-hidden="true">Réflexion</span>
+        </button>
+      </div>
+      <div class="status-line" role="status" aria-live="polite">Réflexion…</div>
+    </div>
+    <div class="header-right">
+      <div class="segmented" role="group" aria-label="Langue">
+        <button type="button" class="active" aria-pressed="true" aria-label="Passer en français">FR</button>
+        <button type="button" aria-label="Passer en anglais">EN</button>
+      </div>
+      <button class="icon-btn" type="button" aria-label="Passer au thème clair" title="Passer au thème clair"><span aria-hidden="true">☀️</span></button>
+    </div>
+  </header>
+  <div class="board" aria-hidden="true">
+    <section class="column">
+      <div class="column-label">À faire</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+      <div class="card-ghost"><div class="ghost-line"></div><div class="ghost-line short"></div></div>
+    </section>
+    <section class="column">
+      <div class="column-label">En cours</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+    </section>
+    <section class="column">
+      <div class="column-label">Terminé</div>
+      <div class="card-ghost"><div class="ghost-line mid"></div><div class="ghost-line short"></div></div>
+    </section>
+  </div>
+</div>
+
+</body>
+</html>

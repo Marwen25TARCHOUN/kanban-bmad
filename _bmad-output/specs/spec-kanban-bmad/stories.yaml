@@ -1,0 +1,315 @@
+- id: "1"
+  title: Backend scaffolding, Card entity, and H2 persistence
+  description: >-
+    Bootstrap the Spring Boot 4.1 project per SPEC constraints; land the Card
+    entity (with the UNIQUE(status, position) constraint) and ddl-auto=update
+    persistence so CAP-5 is testable end-to-end before any controller exists.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Scaffold with Maven, Java 21 LTS, Spring Boot 4.1.x (web + data-jpa +
+    validation + restclient + actuator). Pin `<finalName>kanban</finalName>`
+    in the pom so backend/Dockerfile's `cp target/*.jar` step is deterministic.
+    Track `backend/.mvn/wrapper/maven-wrapper.{jar,properties}` — the earlier
+    /bmad-review flagged that the repo-root .gitignore was blocking them.
+    Card entity: id UUID (server-generated), title (1..120), description
+    (0..2000), priority enum LOW|MEDIUM|HIGH, status enum TODO|IN_PROGRESS|DONE,
+    position int, aiGenerated boolean (immutable after create), generationLocale
+    nullable string (immutable after create), createdAt @CreationTimestamp.
+    Add a DB-level UNIQUE(status, position) constraint. Two application
+    profiles: default (datasource `./kanban.mv.db` next to jar, dev mode) and
+    `container` (datasource `jdbc:h2:file:/data/kanban;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1`,
+    picked up when SPRING_PROFILES_ACTIVE=container). Actuator exposes `health`
+    only (`management.endpoints.web.exposure.include=health`). The one
+    @SpringBootTest integration test writes a Card through the repository,
+    stops the Spring context, restarts against the same kanban.mv.db file, and
+    asserts the Card survived — against the real H2 file, not a mocked one.
+
+- id: "2"
+  title: Card REST CRUD, error envelope, CORS, and config probe
+  description: >-
+    Deliver CAP-1 server-side plus CAP-7 server-gating: the full /api/cards/*
+    surface, the single error envelope, CORS for dev mode, and GET /api/config
+    so the frontend can later decide whether to render the AI breakdown bar.
+  spec_checkpoint: false
+  done_checkpoint: true
+  invoke_dev_with: >-
+    CardController with POST (create), GET (list), PATCH (partial update, incl.
+    move), DELETE (single). Enum literals go on the wire UPPER_SNAKE (default
+    Jackson). PATCH DTOs use `JsonNullable<T>` for the three-state semantics
+    (absent = ignore, value = update, null = clear nullable field only; required
+    fields reject null with 400). Position recomputation lives in CardService
+    inside @Transactional with `SELECT … FOR UPDATE` on the affected status
+    partition before renumbering 0..n-1; the response echoes the authoritative
+    list. GlobalExceptionHandler is a single @RestControllerAdvice translating
+    bean-validation / malformed JSON → 400 VALIDATION_FAILED, EntityNotFound →
+    404 NOT_FOUND, AiUnavailableException → 503 AI_UNAVAILABLE, everything else
+    → 500 INTERNAL_ERROR. 503 is reserved for post-Anthropic-call failures;
+    pre-call input errors return 400. `message` localized via Accept-Language
+    (fr/en). CORS bean (hard-coded @Configuration): allowed origin exactly
+    http://localhost:4200, methods GET/POST/PATCH/DELETE/OPTIONS, headers
+    Content-Type + Accept-Language, no credentials. ConfigController returns
+    `{ aiEnabled: boolean, locales: ["fr","en"] }` from /api/config; `aiEnabled`
+    is true iff the AI bean graph loaded (keyed on Spring Environment, not
+    direct env-var read). @WebMvcTest per controller: happy path plus the
+    validation-failure path. Done-checkpoint pause — Marwen will curl every
+    endpoint before S3 starts.
+
+- id: "3"
+  title: Angular scaffolding, BoardStore, ApiService, tokens.css, three-column rendering
+  description: >-
+    Deliver the frontend shell of CAP-1: an Angular 22 standalone app rendering
+    three ColumnContainer components populated from BoardStore, with the DESIGN.md
+    token system fully wired to light + dark themes.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    `ng new kanban-frontend --standalone --routing=false --style=scss --strict`;
+    zero NgModule anywhere. bootstrapApplication in app.config.ts wires
+    HttpClient, ngx-translate, zoneless if the project supports it cleanly.
+    tokens.css maps every token in DESIGN.md frontmatter (colors — including
+    dark-* and dark-priority-* families, typography, rounded, spacing, shadows,
+    motion, target) onto `:root` and overrides under `:root[data-theme="dark"]`.
+    BoardStore (root-provided service) owns `cards: WritableSignal<Card[]>` and
+    exposes `readonly` projections (`todo`, `inProgress`, `done`, `cardCount`)
+    as `computed()`. Components read via these computed signals and dispatch
+    mutations through BoardStore method calls — never `.set()` on the signal
+    directly from a component. ApiService is the only class that injects
+    HttpClient; BoardStore talks to ApiService. CardStatus and Priority are
+    manually-declared string-union TypeScript types mirroring the Java enums
+    exactly. Three ColumnContainer components render their slice from the
+    computed signal; a read-only Card component displays title + description
+    + priority chip + ✨ AIBadge placeholder. No drag, no edit, no AI — this
+    story is the shell. Verify `npm start` against the backend from Story 2
+    renders whatever cards exist.
+
+- id: "4"
+  title: Manual card operations — drag-drop, inline edit, priority cycle, inline delete
+  description: >-
+    Close CAP-1 frontend by wiring every single-card mutation through the
+    optimistic path and the full UX contract (inline confirm delete, priority
+    chip cycle, keyboard affordances), hitting the <100 ms perceived latency.
+  spec_checkpoint: false
+  done_checkpoint: true
+  invoke_dev_with: >-
+    Add @angular/cdk/drag-drop. Each ColumnContainer is a `cdkDropList`; each
+    Card is a `cdkDrag`. The drop event handler dispatches to
+    `BoardStore.moveCard(cardId, toStatus, toPosition)`, which (a) snapshots
+    the current list, (b) applies the optimistic local mutation, (c) fires
+    PATCH /api/cards/{id} with `{status, position}`, (d) on 2xx replaces the
+    local list with the server response (AD-4 authoritative), (e) on non-2xx
+    or network error restores the snapshot and emits a Toast via the ToastService
+    with the status-class-keyed message from AD-2. Inline edit: click title →
+    textarea with the 120-char soft counter from EXPERIENCE.md Card spec
+    (soft at 100); Enter persists, Esc cancels, blur persists, empty reverts.
+    Description: 2000-char textarea, Shift+Enter inserts newline, 3-line clamp
+    at rest. Priority chip click cycles LOW→MEDIUM→HIGH→LOW, same optimistic
+    PATCH path; chip `min-height: 24px` (WCAG 2.5.8). InlineConfirm delete:
+    icon transforms in place into [Delete][Keep] inline buttons, Delete key on
+    focused card triggers the same flow, focus moves to [Delete] on activation,
+    Esc cancels. Toast component with `role="status" aria-live="polite"`,
+    5 s auto-dismiss, dismiss button carrying the localized aria-label from the
+    microcopy library. Done-checkpoint: Marwen should be able to run the full
+    non-AI demo and visually verify drag <100 ms (NFR-1).
+
+- id: "5"
+  title: AI backend — RestClient, structured output, validator, conditional bean, batch
+  description: >-
+    Deliver CAP-2 server-side, CAP-7 service gating, and the CAP-8 503 path:
+    the strict two-layer AI pipeline with atomic batch persistence, gated by
+    @ConditionalOnProperty so the whole graph omits when the key is absent.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Use RestClient, NOT WebClient (Spring Boot 4.1 provides
+    spring-boot-starter-restclient). AnthropicRestClientConfig is a
+    @Configuration gated by
+    `@ConditionalOnProperty(name="anthropic.api-key", matchIfMissing=false)`;
+    AiBreakdownController, AiBreakdownService, and the RestClient bean itself
+    all live inside this gated graph. When the key is absent, /api/ai/breakdown
+    returns 404 (bean absent) and /api/config.aiEnabled is false. AiBreakdownService
+    posts to https://api.anthropic.com/v1/messages with header
+    `anthropic-version: 2026-10-21` and `output_config.format = { type: "json_schema",
+    schema: { cards: [{ title, description, priority }], minItems: 4, maxItems: 6 } }`
+    so Anthropic is pushed to emit valid JSON at source. Timeouts: 10 s connect,
+    30 s read, zero retry. AiBreakdownValidator is defense-in-depth — re-checks
+    count 4..6, every title non-empty and trimmed to ≤120, every description
+    trimmed to ≤2000, every priority ∈ enum — treating structured output as a
+    best-effort signal, never trust alone. Any deviation (network failure,
+    non-JSON, schema violation, wrong count, upstream non-2xx) throws
+    AiUnavailableException → 503 via the GlobalExceptionHandler from S2. The
+    batch endpoint POST /api/cards/batch is atomic all-or-nothing inside one
+    @Transactional method; body carries full card payloads (title, description,
+    priority — never id, position, aiGenerated, generationLocale); the server
+    sets id (UUID), position (append at end of TODO), aiGenerated=true,
+    generationLocale from the originating breakdown request's locale. No 207,
+    no partial. Unit tests feed the validator poisoned Anthropic responses
+    (empty, too few cards, too many, missing fields, wrong enum values, empty
+    title, over-length description). @WebMvcTest on the controller covers happy
+    path plus the 503-on-service-exception path.
+
+- id: "6"
+  title: AI frontend — breakdown bar, hero, loading, preview modal, accept, badges
+  description: >-
+    Deliver CAP-2 frontend, CAP-3 badge, CAP-7 UI hiding, and CAP-8 UI recovery:
+    the full flagship demo surface end-to-end, with the climax-beat affordances
+    the UX spec demands.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    App bootstrap probes GET /api/config and stores aiEnabled in a feature
+    service; AIBreakdownBar renders only when true. Two variants per
+    DESIGN.md.components: Input.hero + Button-Primary.hero when the board is
+    empty (EmptyStateHero layout with the accent-100 gradient and one-time pulse
+    on first load, suppressed under prefers-reduced-motion); Input.compact +
+    Button-Primary.compact header-center once any card exists. Loading state:
+    the button gets `aria-busy="true"`, the input disables, and a sibling
+    `<div role="status" aria-live="polite">` under the input carries
+    "Thinking…" / "Réflexion…" (localized). A visually-hidden live region
+    announces "Generating cards…" / "Génération des cartes…" at request start
+    and "Preview ready" / "Aperçu prêt" when the modal opens (or "Preview
+    failed" / "Échec de la génération" on 503). PreviewModal is `<dialog>` with
+    focus trap, Esc cancels, backdrop click cancels, select-all checkbox, five
+    PreviewCardRow entries each with a 24×24 wrapping-label checkbox around the
+    16px glyph, inline-editable title with a trailing `✎` glyph at `opacity:
+    0.4` at rest that brightens to `1.0` on `:hover` or `:focus-within` (the
+    load-bearing climax-beat affordance — never hover-only), read-only
+    description, read-only PriorityChip. The originating idea is echoed in the
+    modal subtitle in mono. Accept selected → POST /api/cards/batch with the
+    full selected payloads; on 2xx the modal closes and cards stagger-fade
+    into To Do over 150 ms × 40 ms (prefers-reduced-motion collapses to instant
+    swap); on non-2xx the modal stays open with an inline error at the footer,
+    the input idea is retained, the user can edit titles further and retry
+    (this resolves the SPEC Open Question — batch 400 UI treatment mirrors
+    CAP-8). Cards carry the ✨ AIBadge (small accent-100/accent-700 pill in
+    light mode, dark-accent-bg/dark-accent-fg in dark) when aiGenerated=true;
+    the badge wrapper carries localized aria-label "AI-generated" /
+    "Généré par l'IA"; the ✨ glyph itself is aria-hidden. Toast on 503 uses the
+    status-class-keyed mapping from AD-2 (fr/en messages from the microcopy
+    library). Done-checkpoint: Marwen demos the full flagship flow before S7.
+
+- id: "7"
+  title: Bilingual UI + full accessibility contract
+  description: >-
+    Deliver CAP-4 and close the NFR-9 a11y floor: runtime locale switching,
+    theme toggle with OS-preference default, and the full aria surface from
+    EXPERIENCE.md across every component built so far.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    ngx-translate 18.x with @ngx-translate/http-loader loading fr.json and
+    en.json from /assets/i18n at bootstrap. LocaleSwitcher is a SegmentedControl
+    with two items (FR / EN); click calls BOTH `TranslateService.use(locale)`
+    AND `document.documentElement.lang = locale` — the second one is non-
+    negotiable for screen-reader voice selection. Persist to localStorage key
+    `kanban-locale`; default to `navigator.language` if fr or en, else en.
+    Each segment item carries a localized aria-label ("Switch to French" /
+    "Passer en français", "Switch to English" / "Passer en anglais") and
+    cleared the 24×24 target floor. ThemeToggle is an IconButton; click toggles
+    `data-theme` on `<html>` between light and dark; first load matches
+    `prefers-color-scheme` via a @media guard in tokens.css; persisted in
+    localStorage key `kanban-theme`. aria-label localized ("Switch to dark
+    theme" / "Passer au thème sombre" and the light counterpart); sun/moon
+    glyph carries aria-hidden. Every icon-only button across the app (Card
+    delete icon, QuickAdd "+", Toast Dismiss, InlineConfirm actions) gains a
+    localized aria-label from the microcopy library; `title=` is OK for sighted
+    tooltips but never the sole accessible name. ColumnContainer renders as
+    `<section aria-labelledby="col-{status}-label">` with the label as
+    `<h2 id="col-{status}-label" class="column-label">`; the card list sits
+    inside as `<ul role="list">`. The brand ✨ glyph in the header, the ✨ inside
+    the Break-down button, and the ✨ inside AIBadge all carry aria-hidden
+    (the surrounding text / aria-label is the accessible name). AI breakdown
+    POST body includes `locale: <active>` so the server persists
+    `Card.generationLocale`. In the frontend, when rendering a Card whose
+    `aiGenerated === true`, stamp `lang="<generationLocale>"` on the title and
+    description nodes — so AI-French content keeps the French voice even after
+    the user switches the UI to English (and vice versa). Microcopy library in
+    EXPERIENCE.md is the source of truth; keep fr.json and en.json aligned to
+    it 1:1.
+
+- id: "8"
+  title: Containerization, launchers, and /bmad-review fixes
+  description: >-
+    Deliver CAP-6 primary run mode and apply every stop-the-demo + portfolio-
+    polish finding from the earlier /bmad-review pass, so a reviewer can go
+    from `git clone` to a running stack in one command.
+  spec_checkpoint: true
+  done_checkpoint: true
+  invoke_dev_with: >-
+    The Docker scaffolding already exists at the repo root (docker-compose.yml,
+    backend/Dockerfile, frontend/Dockerfile, frontend/nginx.conf, start-windows.ps1,
+    stop-windows.ps1, start.bat, stop.bat, start.sh, stop.sh, .env.example,
+    .gitignore, README.md). Apply these fixes in-place (from the /bmad-review
+    report earlier this run):
+
+    STOP-THE-DEMO tier:
+    (1) pom.xml pins `<finalName>kanban</finalName>` — avoids the `cp target/*.jar`
+        collision with `*.jar.original`. (2) Create backend/.dockerignore (target,
+        .git, *.md, .idea, .vscode, .env*) and frontend/.dockerignore (node_modules,
+        dist, .angular, .nx, coverage, .env*, *.log). (3) Add .gitattributes:
+        `*.sh text eol=lf` and `*.ps1 text eol=crlf`. (4) docker-compose.yml:
+        bump `start_period: 90s` on the backend healthcheck (cold Docker Desktop
+        on Windows regularly exceeds 70 s). (5) Remove the duplicate `HEALTHCHECK`
+        directive from backend/Dockerfile — compose owns orchestration healthchecks
+        per AD-15. (6) In start-windows.ps1 and start.sh: add `docker compose
+        version` probe AFTER `docker info` and fail fast if Compose v2 plugin is
+        absent. (7) In start-windows.ps1: replace `docker info 2>$null | Out-Null`
+        with `& docker info *> $null` and remove the Stop-throws-on-stderr failure
+        path for the probe. (8) Add port 4200 and 8080 preflight in both launchers
+        with the PID of the holder in the error message.
+
+    PORTFOLIO-POLISH tier:
+    (9) nginx.conf: add security headers at server scope — `X-Content-Type-Options
+        nosniff`, `X-Frame-Options DENY`, `Referrer-Policy strict-origin-when-cross-origin`,
+        `Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src
+        'self' data:; style-src 'self' 'unsafe-inline'"`. (10) nginx.conf: add
+        `location = /api { return 308 /api/; }` so a bare /api doesn't fall through
+        to the SPA fallback and return HTML with 200. (11) frontend/Dockerfile:
+        auto-detect the Angular dist folder — `RUN D=$(ls -1 dist | head -n1) &&
+        mkdir -p /final && cp -R dist/$D/browser/. /final/` and then COPY from
+        /final/ instead of hard-coding kanban-frontend. (12) Tighten the .env regex
+        in both launchers to `^ANTHROPIC_API_KEY=sk-ant-[A-Za-z0-9_-]{20,}$` so
+        placeholders like `your-key-here` don't register as "AI enabled". (13)
+        Both launchers: warn on BOM or CR in the key line.
+
+    SPINE/README sync: application-container.yml already exists from S1; verify
+    compose service name `backend` matches nginx `proxy_pass http://backend:8080/api/;`.
+    Done-checkpoint pause after `./start.sh` works on a clean machine end-to-end.
+
+- id: "9"
+  title: Demo polish, README reconciliation, manual QA runbook
+  description: >-
+    Tie off every loose end from the review passes — the visual proof and
+    discoverability a reviewer will register in a 60-second skim, plus the
+    manual QA runbook that closes the orchestration verification-gap findings.
+  spec_checkpoint: false
+  done_checkpoint: true
+  invoke_dev_with: >-
+    (1) Run the full stack (dev or container mode), take a screenshot of the
+    populated board in light theme (the main-board mock composition — AI-born
+    cards with ✨ badges in To Do, one card In Progress, one Done); embed it at
+    the top of README under the one-line pitch. A short animated GIF of the
+    AI breakdown flow (empty state → type idea → modal → accept → cards appear)
+    is even better if you have time. (2) Add a byline line under the H1:
+    `*Portfolio project · November 2026 · Marwen Tarchoun*`. (3) Add a "## Docs"
+    section near the top (above Prerequisites) with two links: one to
+    `_bmad-output/planning-artifacts/architecture/.../ARCHITECTURE-SPINE.md`,
+    one to `.../solution-design.md`. (4) In the Development-mode section,
+    split the mvnw command into two code fences: Windows (`cd backend; .\mvnw.cmd
+    spring-boot:run`) and Mac/Linux (`cd backend && ./mvnw spring-boot:run`).
+    (5) Apply the prose-lens fixes: "Mac" → "macOS" everywhere, spell out "ADs"
+    → "architecture decisions" on first use, drop two of three `just` filler
+    words, add the Oxford-style comma before `so` in the dev-mode sentence.
+    (6) Fix the `-Purge` vs `--purge` drift: README uses `-Purge` correctly;
+    ARCHITECTURE-SPINE.md lines 191 and 342 both write `stop-windows.ps1
+    --purge` — update them to `-Purge`. (7) Run an ngx-translate missing-key
+    scan (typically `ngx-translate-lint` or a simple grep-and-check) before the
+    demo so no `[MISSING: key]` renders show up. (8) Append a 4-step manual QA
+    runbook to the architecture memlog as a `--type event`, closing the
+    verification-gap findings from the earlier /bmad-review: "fresh clone →
+    ./start.sh (or .bat) → both URLs resolve within 30 s → POST a card via the
+    UI → docker compose down → docker compose up → card still there → ./stop.sh
+    --purge → type 'yes' → card gone". (9) Final demo rehearsal: full 5-min
+    script, both themes, FR + EN switch mid-demo, degraded mode (unset
+    ANTHROPIC_API_KEY, restart, show AI bar disappears). Done-checkpoint: the
+    ship line — pause here before any further scope creep.

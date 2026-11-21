@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Main Board (Light + Dark) — Local AI Kanban</title>
+<meta name="description" content="Compact side-by-side preview of the populated Kanban in light + dark mode. Token-faithful to DESIGN.md.">
+<style>
+  /* Shared tokens — mirror DESIGN.md frontmatter exactly. */
+  :root {
+    --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+    /* Accent — shifted one step darker; passes 4.5:1 white-text at rest */
+    --accent-500: #4F46E5;
+    --accent-600: #4338CA;
+    --accent-700: #3730A3;
+    --accent-100: #E0E7FF;
+
+    /* Dark-mode AIBadge tokens (DESIGN.md dark-accent-*) */
+    --dark-accent-bg: rgba(99,102,241,0.2);
+    --dark-accent-fg: #A5B4FC;
+
+    /* Priority chips — light-mode text (dark theme overrides below) */
+    --priority-low: #475569;         /* slate-600 */
+    --priority-low-bg: #F1F5F9;
+    --priority-medium: #92400E;      /* amber-800 */
+    --priority-medium-bg: #FEF3C7;
+    --priority-high: #B91C1C;        /* red-700 */
+    --priority-high-bg: #FEE2E2;
+  }
+  .theme-light {
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --text-primary: #09090B;
+    --text-secondary: #52525B;
+    --text-tertiary: #71717A;          /* passes 4.5:1 on bg-surface */
+    --border-default: #E4E4E7;
+    --border-strong: #71717A;          /* passes 3:1 non-text chrome */
+  }
+  .theme-dark {
+    --bg-page: #09090B;
+    --bg-surface: #18181B;
+    --bg-subtle: #27272A;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #A1A1AA;          /* shifted lighter — passes 4.5:1 on dark surfaces */
+    --border-default: #3F3F46;         /* distinct from bg-subtle — cards visible */
+    --border-strong: #71717A;          /* passes 3:1 non-text chrome */
+    /* Dark priority pairings — PRD FR-7 hues preserved, L adjusted */
+    --priority-low: #94A3B8;
+    --priority-low-bg: #0F172A;
+    --priority-medium: #FBBF24;
+    --priority-medium-bg: #422006;
+    --priority-high: #F87171;
+    --priority-high-bg: #2C0B0B;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: #71717A;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    min-height: 100vh;
+  }
+  body::before {
+    content: "Side-by-side: light mode (left) and dark mode (right). Compact-density preview, same board state.";
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: white;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 12px;
+    border-radius: 4px;
+    z-index: 100;
+  }
+
+  /* App shell per theme */
+  .app {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 720px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+    gap: 16px;
+  }
+  .brand {
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-primary);
+  }
+  .ai-bar {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    max-width: 480px;
+  }
+  /* Input/Button in compact variant (header-center density) */
+  .ai-input {
+    flex: 1;
+    padding: 4px 8px;
+    min-height: 28px;          /* touch target 24×24 min; hit area via padding */
+    font-size: 0.875rem;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+  }
+  .ai-input::placeholder { color: var(--text-tertiary); }
+  .ai-btn {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    min-height: 28px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.8125rem;
+  }
+  .segmented button {
+    background: transparent;
+    border: none;
+    padding: 4px 10px;
+    min-height: 28px;           /* 24×24 floor cleared */
+    min-width: 32px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: inherit;
+  }
+  .segmented button.active {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .icon-btn {
+    width: 32px;                /* reconciled to 32px baseline */
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  /* Board */
+  .board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 16px;
+  }
+  .column {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 280px;           /* DESIGN.md Column.min-width */
+    max-width: 360px;
+  }
+  .column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 4px 6px;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .column-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0;                  /* reset h2 */
+  }
+  .column-count {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+  }
+  .quick-add {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 6px 8px;
+    min-height: 28px;
+    border-radius: 4px;
+    border: 1px dashed var(--border-strong);
+    cursor: pointer;
+    text-align: center;
+  }
+  .quick-add:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+  /* Card */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .card-title {
+    font-size: 0.875rem;        /* compact density — documented variant */
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+  }
+  .ai-badge {
+    background: var(--accent-100);
+    color: var(--accent-700);
+    border-radius: 9999px;
+    padding: 2px 6px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .theme-dark .ai-badge {
+    background: var(--dark-accent-bg);
+    color: var(--dark-accent-fg);
+  }
+  .card-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2px;
+  }
+  .priority-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 4px 8px;           /* bumped padding-y so chip clears 24px */
+    min-height: 24px;           /* WCAG 2.5.8 AA */
+    border-radius: 6px;
+  }
+  .priority-low { color: var(--priority-low); background: var(--priority-low-bg); }
+  .priority-medium { color: var(--priority-medium); background: var(--priority-medium-bg); }
+  .priority-high { color: var(--priority-high); background: var(--priority-high-bg); }
+  .card-time {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+  }
+
+  /* Screen-reader-only utility */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- LIGHT MODE -->
+<div class="app theme-light">
+  <header class="header">
+    <div class="brand"><span aria-hidden="true">✨</span> Local AI Kanban</div>
+    <div class="ai-bar" role="search">
+      <input class="ai-input" placeholder="Describe what you want to break down…" aria-label="Describe what you want to break down">
+      <button class="ai-btn" type="button"><span aria-hidden="true">✨</span> Break down with AI</button>
+    </div>
+    <div class="header-right">
+      <div class="segmented" role="group" aria-label="Language">
+        <button type="button" aria-label="Switch to French">FR</button>
+        <button type="button" class="active" aria-pressed="true" aria-label="Switch to English">EN</button>
+      </div>
+      <button class="icon-btn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span aria-hidden="true">🌙</span></button>
+    </div>
+  </header>
+  <div class="board">
+    <section class="column" aria-labelledby="col-todo-label-l">
+      <div class="column-header"><h2 id="col-todo-label-l" class="column-label">To Do</h2><span class="column-count" aria-label="4 cards">4</span></div>
+      <div class="quick-add" role="button" tabindex="0" aria-label="Add a task">+ Add a task…</div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Set up Fly.io account and CLI</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Create a Fly.io account, install the flyctl CLI, authenticate from the terminal, and verify access to the free tier.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Write Dockerfile + .dockerignore</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Multi-stage build, non-root user, slim base image. Include .dockerignore to keep node_modules and secrets out of context.</p>
+            <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Configure fly.toml</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Primary region, health checks, autoscaling rules, environment variables.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Test deploy and rollback</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Deploy to Fly.io, verify the app responds, trigger a rollback to confirm the pipeline reverses cleanly.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+    <section class="column" aria-labelledby="col-inprogress-label-l">
+      <div class="column-header"><h2 id="col-inprogress-label-l" class="column-label">In Progress</h2><span class="column-count" aria-label="1 card">1</span></div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Refactor auth middleware</span></div>
+            <p class="card-desc">Extract the token validation from the controller into a dedicated filter. Covered by the new unit test.</p>
+            <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">2h ago</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+    <section class="column" aria-labelledby="col-done-label-l">
+      <div class="column-header"><h2 id="col-done-label-l" class="column-label">Done</h2><span class="column-count" aria-label="1 card">1</span></div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Set up repo and CI</span></div>
+            <p class="card-desc">Created the repo, pushed first commit, GitHub Actions running on push.</p>
+            <div class="card-meta"><span class="priority-chip priority-low">Low</span><span class="card-time">1d ago</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<!-- DARK MODE -->
+<div class="app theme-dark">
+  <header class="header">
+    <div class="brand"><span aria-hidden="true">✨</span> Local AI Kanban</div>
+    <div class="ai-bar" role="search">
+      <input class="ai-input" placeholder="Describe what you want to break down…" aria-label="Describe what you want to break down">
+      <button class="ai-btn" type="button"><span aria-hidden="true">✨</span> Break down with AI</button>
+    </div>
+    <div class="header-right">
+      <div class="segmented" role="group" aria-label="Language">
+        <button type="button" aria-label="Switch to French">FR</button>
+        <button type="button" class="active" aria-pressed="true" aria-label="Switch to English">EN</button>
+      </div>
+      <button class="icon-btn" type="button" aria-label="Switch to light theme" title="Switch to light theme"><span aria-hidden="true">☀️</span></button>
+    </div>
+  </header>
+  <div class="board">
+    <section class="column" aria-labelledby="col-todo-label-d">
+      <div class="column-header"><h2 id="col-todo-label-d" class="column-label">To Do</h2><span class="column-count" aria-label="4 cards">4</span></div>
+      <div class="quick-add" role="button" tabindex="0" aria-label="Add a task">+ Add a task…</div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Set up Fly.io account and CLI</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Create a Fly.io account, install the flyctl CLI, authenticate from the terminal, and verify access to the free tier.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Write Dockerfile + .dockerignore</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Multi-stage build, non-root user, slim base image. Include .dockerignore to keep node_modules and secrets out of context.</p>
+            <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Configure fly.toml</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Primary region, health checks, autoscaling rules, environment variables.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Test deploy and rollback</span><span class="ai-badge" aria-label="AI-generated"><span aria-hidden="true">✨</span></span></div>
+            <p class="card-desc">Deploy to Fly.io, verify the app responds, trigger a rollback to confirm the pipeline reverses cleanly.</p>
+            <div class="card-meta"><span class="priority-chip priority-medium">Medium</span><span class="card-time">just now</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+    <section class="column" aria-labelledby="col-inprogress-label-d">
+      <div class="column-header"><h2 id="col-inprogress-label-d" class="column-label">In Progress</h2><span class="column-count" aria-label="1 card">1</span></div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Refactor auth middleware</span></div>
+            <p class="card-desc">Extract the token validation from the controller into a dedicated filter. Covered by the new unit test.</p>
+            <div class="card-meta"><span class="priority-chip priority-high">High</span><span class="card-time">2h ago</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+    <section class="column" aria-labelledby="col-done-label-d">
+      <div class="column-header"><h2 id="col-done-label-d" class="column-label">Done</h2><span class="column-count" aria-label="1 card">1</span></div>
+      <ul role="list" style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+        <li>
+          <article class="card">
+            <div class="card-title-row"><span class="card-title">Set up repo and CI</span></div>
+            <p class="card-desc">Created the repo, pushed first commit, GitHub Actions running on push.</p>
+            <div class="card-meta"><span class="priority-chip priority-low">Low</span><span class="card-time">1d ago</span></div>
+          </article>
+        </li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+</body>
+</html>

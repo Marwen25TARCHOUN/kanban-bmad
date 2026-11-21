@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Empty State — Local AI Kanban</title>
+<meta name="description" content="First-boot hero with AI prompt and columns-peek. Token-faithful to DESIGN.md.">
+<style>
+  :root {
+    --bg-page: #FAFAFA;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F4F4F5;
+    --text-primary: #09090B;
+    --text-secondary: #52525B;
+    --text-tertiary: #71717A;          /* passes 4.5:1 on bg-surface */
+    --border-default: #E4E4E7;
+    --border-strong: #71717A;          /* passes 3:1 non-text chrome */
+    --accent-500: #4F46E5;             /* rest — passes 6.21:1 on white */
+    --accent-600: #4338CA;             /* hover */
+    --accent-700: #3730A3;             /* active */
+    --accent-100: #E0E7FF;
+    --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg-page);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+  }
+  .brand {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);        /* Rule 1: accent reserved for the ✨ CTA at rest */
+  }
+  .header-right { display: flex; gap: 12px; align-items: center; }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.875rem;
+  }
+  .segmented button {
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    min-height: 28px;                  /* WCAG 2.5.8 24×24 floor cleared */
+    min-width: 32px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: inherit;
+  }
+  .segmented button.active {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .icon-btn {
+    width: 32px;                       /* reconciled to 32px baseline per DESIGN.md */
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  /* Hero */
+  .hero {
+    flex: 1;
+    background: linear-gradient(180deg, var(--accent-100) 0%, var(--bg-page) 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+  }
+  .hero-content {
+    max-width: 640px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .hero-headline {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    color: var(--text-primary);
+  }
+  .hero-input-group {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .hero-input {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 1rem;
+    font-family: inherit;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+  }
+  .hero-input::placeholder { color: var(--text-tertiary); }
+  .hero-input:focus {
+    outline: none;
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+  }
+  .btn-primary {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    min-height: 44px;
+    font-size: 1rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    animation: pulse 1.5s ease-in-out;
+  }
+  .btn-primary:hover { background: var(--accent-600); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.45); }
+    50% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0); }
+  }
+  /* Respect reduced-motion for the one-time pulse */
+  @media (prefers-reduced-motion: reduce) {
+    .btn-primary { animation: none; }
+  }
+  .hero-secondary {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-decoration: none;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero-secondary:hover { color: var(--accent-600); }
+
+  /* Empty-state hint columns peek */
+  .columns-peek {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 0 32px 32px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+    opacity: 0.35;
+  }
+  .column-shell {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 120px;
+  }
+  .column-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+  <header class="header">
+    <div class="brand"><span aria-hidden="true">✨</span> Local AI Kanban</div>
+    <div class="header-right">
+      <div class="segmented" role="group" aria-label="Language">
+        <button type="button" aria-label="Switch to French">FR</button>
+        <button type="button" class="active" aria-pressed="true" aria-label="Switch to English">EN</button>
+      </div>
+      <button class="icon-btn" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span aria-hidden="true">🌙</span></button>
+    </div>
+  </header>
+
+  <main class="hero">
+    <div class="hero-content">
+      <h1 class="hero-headline">Got an idea? Let AI break it down into cards</h1>
+      <div class="hero-input-group" role="search">
+        <input class="hero-input" type="text" placeholder="Describe what you want to break down…" aria-label="Describe what you want to break down">
+        <button class="btn-primary" type="button"><span aria-hidden="true">✨</span> Break down with AI</button>
+      </div>
+      <a href="#" class="hero-secondary">or add a card manually →</a>
+    </div>
+  </main>
+
+  <section class="columns-peek" aria-hidden="true">
+    <div class="column-shell"><div class="column-label">To Do · 0</div></div>
+    <div class="column-shell"><div class="column-label">In Progress · 0</div></div>
+    <div class="column-shell"><div class="column-label">Done · 0</div></div>
+  </section>
+</body>
+</html>
