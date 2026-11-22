@@ -62,9 +62,33 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          Story 2 (AD-13 three-state PATCH): `JsonNullable<T>` lets the DTO distinguish
+          "absent key" (ignore), "value" (update), and "null" (clear) in a PATCH body.
+          Spring Boot auto-picks up any `com.fasterxml.jackson.databind.Module` bean, so
+          CorsConfig registers `JsonNullableModule` once and Jackson handles the rest.
+        -->
+        <dependency>
+            <groupId>org.openapitools</groupId>
+            <artifactId>jackson-databind-nullable</artifactId>
+            <version>0.2.13</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Spring Boot 4.x split the web-MVC slice-test support into `spring-boot-webmvc-test`
+          (new package: `org.springframework.boot.webmvc.test.autoconfigure`). It's not pulled in
+          transitively by `spring-boot-starter-test`, so controller `@WebMvcTest`s need it added
+          explicitly. Version is managed by the Spring Boot BOM.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
