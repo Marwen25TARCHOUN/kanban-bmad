@@ -1,0 +1,32 @@
+# Default profile — dev mode (architecture AD-15).
+#
+# H2 file lives next to the working directory (./kanban.mv.db) so `./mvnw spring-boot:run`
+# gives the developer an inspectable file at the repo's backend/ path. CAP-5 / FR-21 / FR-22:
+# the board survives shutdown and restart with no configuration step.
+server:
+  port: 8080
+
+spring:
+  application:
+    name: kanban
+  datasource:
+    url: jdbc:h2:file:./kanban;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update   # No Flyway in MVP (spec non-goal); schema evolves with the entity.
+    open-in-view: false  # AD-1: entities never leave the service layer.
+
+# Actuator — health only (architecture AD-15, no /env, /beans, /metrics in MVP).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: false   # Keep /actuator/health body at `{"status":"UP"}` per acceptance criteria.

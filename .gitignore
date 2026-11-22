@@ -7,7 +7,6 @@
 
 # Backend build outputs
 backend/target/
-backend/.mvn/
 backend/HELP.md
 backend/mvnw.cmd.bak
 
