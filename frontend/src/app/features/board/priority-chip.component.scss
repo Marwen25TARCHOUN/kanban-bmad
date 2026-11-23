@@ -1,0 +1,37 @@
+:host {
+  display: inline-flex;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--chip-min-height);
+  min-width: var(--chip-min-height);
+  padding: var(--chip-padding-y) var(--chip-padding-x);
+  border-radius: var(--chip-radius);
+  font-family: var(--sans);
+  font-size: var(--size-xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  letter-spacing: 0.01em;
+}
+
+.chip-label {
+  display: inline-block;
+}
+
+.chip-low {
+  background-color: var(--priority-low-bg);
+  color: var(--priority-low);
+}
+
+.chip-medium {
+  background-color: var(--priority-medium-bg);
+  color: var(--priority-medium);
+}
+
+.chip-high {
+  background-color: var(--priority-high-bg);
+  color: var(--priority-high);
+}
