@@ -1,32 +1,41 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 import { Priority } from '../../core/models/card';
 
 /**
- * Inline pill rendering the card's priority (LOW / MEDIUM / HIGH).
+ * Clickable pill rendering the card's priority (LOW / MEDIUM / HIGH).
  *
- * Read-only this story; click-to-cycle interaction lands in story 4.
- * Hardcoded English labels (localization in story 7). The wrapper carries a
- * localized-ready `aria-label` so screen readers hear "Priority: High"
- * instead of a bare "High".
+ * Click or Space cycles LOW → MEDIUM → HIGH → LOW (story 4, EXPERIENCE.md
+ * PriorityChip). The chip emits a `cycle` output and lets its parent
+ * (`CardComponent`) dispatch to `BoardStore.cyclePriority` — the chip
+ * itself is dumb, never injects the store (AD-9).
+ *
+ * The outer element is a real `<button>` so Space/Enter activation, focus
+ * ring, and the 24×24 hit target come from the browser's defaults. ARIA
+ * label follows EXPERIENCE.md ("Priority: {level}, click to cycle"); English
+ * strings land here, story 7 localizes.
  */
 @Component({
   selector: 'app-priority-chip',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span
+    <button
+      type="button"
       class="chip chip-{{ priorityLower() }}"
       [attr.data-priority]="priority()"
-      [attr.aria-label]="'Priority: ' + label()"
+      [attr.aria-label]="ariaLabel()"
+      (click)="onCycle($event)"
     >
       <span class="chip-label">{{ label() }}</span>
-    </span>
+    </button>
   `,
   styleUrls: ['./priority-chip.component.scss'],
 })
 export class PriorityChipComponent {
   readonly priority = input.required<Priority>();
+
+  readonly cycle = output<void>();
 
   readonly priorityLower = computed(() => this.priority().toLowerCase());
 
@@ -44,4 +53,13 @@ export class PriorityChipComponent {
         return String(this.priority());
     }
   });
+
+  readonly ariaLabel = computed(() => `Priority: ${this.label()}, click to cycle`);
+
+  onCycle(event: Event): void {
+    // Prevent the surrounding card click / drag handlers from firing when
+    // the chip is activated — the chip owns this gesture.
+    event.stopPropagation();
+    this.cycle.emit();
+  }
 }

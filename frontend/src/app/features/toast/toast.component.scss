@@ -1,0 +1,91 @@
+// Bottom-right stack per EXPERIENCE.md → Interaction Primitives → Toast.
+// Visual tokens from DESIGN.md → components.Toast and components.IconButton.
+
+:host {
+  // The toast layer must float above the board without blocking card hits
+  // when empty. Fixed positioning and pointer-events gating keep the empty
+  // container transparent to the layer underneath.
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: var(--spacing-4);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast-stack {
+  display: flex;
+  flex-direction: column-reverse; // Newest on top (EXPERIENCE.md Toast).
+  align-items: flex-end;
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  min-width: var(--column-min-width);
+  max-width: var(--column-max-width);
+  padding: var(--toast-padding);
+  background-color: var(--toast-bg);
+  border: var(--toast-border);
+  // Error variant tints the left edge with status-error — the only accent
+  // on the toast surface so the status reads at a glance (DESIGN.md Toast).
+  border-left: var(--motion-focus-ring-width) solid var(--status-error);
+  border-radius: var(--toast-radius);
+  box-shadow: var(--toast-shadow);
+  color: var(--text-primary);
+  pointer-events: auto;
+  animation: toast-slide-in 150ms ease-out;
+}
+
+.toast-message {
+  flex: 1 1 auto;
+  font-size: var(--size-sm);
+  line-height: var(--leading-normal);
+  word-break: break-word;
+}
+
+.toast-dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-button-size-compact);
+  height: var(--icon-button-size-compact);
+  min-width: var(--target-min-size);
+  min-height: var(--target-min-size);
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: var(--icon-button-radius);
+  color: var(--icon-button-fg);
+  font-size: var(--size-lg);
+  line-height: 1;
+}
+
+.toast-dismiss:hover {
+  background-color: var(--icon-button-bg-hover);
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// Reduced-motion carve-out (EXPERIENCE.md Accessibility Floor → "toast slide"
+// listed under reduced-motion disables). Replace the slide with an instant
+// opacity swap so the information still appears but without lateral motion.
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

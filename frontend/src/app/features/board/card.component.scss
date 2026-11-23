@@ -3,6 +3,7 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--card-gap);
@@ -11,6 +12,30 @@
   border: var(--card-border);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow-rest);
+  cursor: grab;
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+// CDK drag states (EXPERIENCE.md Dragging). CDK applies these classes to
+// the draggable element itself — the `<article class="card">` — so the
+// selectors compound with `.card`, not with `:host`.
+.card.cdk-drag-preview {
+  box-shadow: var(--card-shadow-dragging);
+  transform: rotate(var(--motion-tilt-dragging));
+  cursor: grabbing;
+}
+
+.card.cdk-drag-placeholder {
+  opacity: var(--motion-opacity-dragging);
+}
+
+.card.is-deleting {
+  opacity: 0;
+  transform: scale(0.95);
 }
 
 .card-header {
@@ -22,11 +47,34 @@
 
 .card-title {
   margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--size-base);
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
   color: var(--text-primary);
   word-break: break-word;
+  cursor: text;
+}
+
+.card-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: var(--size-base);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  background-color: var(--input-bg);
+  border: var(--input-border);
+  border-radius: var(--input-radius);
+  padding: var(--input-padding-y) var(--input-padding-x);
+}
+
+.card-title-input:focus {
+  outline: none;
+  border: var(--input-border-focus);
+  box-shadow: var(--input-ring-focus);
 }
 
 .ai-badge-slot {
@@ -34,6 +82,74 @@
   flex: 0 0 auto;
   min-width: 0;
   min-height: var(--target-min-size);
+}
+
+.card-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+// Delete icon hidden until :hover or :focus-within
+.card-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-button-size-compact);
+  height: var(--icon-button-size-compact);
+  min-width: var(--target-min-size);
+  min-height: var(--target-min-size);
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: var(--icon-button-radius);
+  color: var(--icon-button-fg);
+  font-size: var(--size-lg);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.card:hover .card-delete,
+.card:focus-within .card-delete {
+  opacity: 1;
+}
+
+.card-delete:hover {
+  background-color: var(--icon-button-bg-hover);
+}
+
+.card-confirm-delete,
+.card-confirm-keep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--target-min-size);
+  min-height: var(--target-min-size);
+  padding: var(--button-secondary-padding-y) var(--button-secondary-padding-x);
+  font-family: var(--sans);
+  font-size: var(--size-xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  border-radius: var(--button-secondary-radius);
+  border: var(--button-secondary-border);
+  cursor: pointer;
+}
+
+.card-confirm-delete {
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
+  border-color: var(--status-error);
+}
+
+.card-confirm-keep {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
+}
+
+.card-confirm-keep:hover {
+  background-color: var(--button-secondary-bg-hover);
 }
 
 .card-description {
@@ -47,6 +163,40 @@
   line-clamp: 3;
   overflow: hidden;
   word-break: break-word;
+  cursor: text;
+}
+
+.card-description-placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.card-description-input {
+  width: 100%;
+  min-height: var(--target-min-size);
+  font-family: var(--sans);
+  font-size: var(--size-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  background-color: var(--input-bg);
+  border: var(--input-border);
+  border-radius: var(--input-radius);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  resize: vertical;
+}
+
+.card-description-input:focus {
+  outline: none;
+  border: var(--input-border-focus);
+  box-shadow: var(--input-ring-focus);
+}
+
+.card-counter {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: var(--size-xs);
+  color: var(--text-tertiary);
+  padding-top: var(--spacing-1);
 }
 
 .card-footer {
@@ -54,4 +204,20 @@
   align-items: center;
   justify-content: flex-start;
   gap: var(--spacing-2);
+}
+
+// Reduced-motion carve-out (EXPERIENCE.md Accessibility Floor)
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: opacity 0ms;
+  }
+  .card.is-deleting {
+    transform: none;
+  }
+  .card.cdk-drag-preview {
+    transform: none;
+  }
+  .card-delete {
+    transition: none;
+  }
 }
