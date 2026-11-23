@@ -244,7 +244,7 @@ Versions web-verified against upstream release notes on 2026-11-20. 3.3-line Spr
 | Angular | 22.x (pin exact minor at `ng new` time via `angular.dev`) |
 | @angular/cdk | 22.x (matching Angular minor) |
 | @ngx-translate/core + @ngx-translate/http-loader | 18.x (single line now spans Angular 18..22+) |
-| Node | 22 LTS (Angular 22 floor; also required by Node 20 EOL on 2026-04-30) |
+| Node | 26 LTS (bumped 2026-11-23 — Node 26 reached LTS Oct 2026; Angular CLI 22.x accepts `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0`, so older LTS lines still satisfy `engines` for contributors on 22 or 24) |
 | Anthropic API | `claude-opus-4-7` via `POST https://api.anthropic.com/v1/messages`, header `anthropic-version: 2026-10-21`, structured output forced with `output_config.format = { type: "json_schema", schema: … }`. Called via Spring `RestClient` (not `WebClient`); no SDK. |
 | `spring-boot-starter-actuator` | bundled with Spring Boot 4.1 — exposes `/actuator/health` only (`management.endpoints.web.exposure.include=health`); same port 8080, same context |
 | Docker Engine + Compose v2 | user-supplied (Docker Desktop on Windows/Mac, Docker Engine on Linux); plugin invocation `docker compose`, not legacy `docker-compose` |

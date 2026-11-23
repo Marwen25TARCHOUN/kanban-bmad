@@ -4,7 +4,7 @@ Angular 22 standalone + signals shell for the Local AI Kanban board.
 
 ## Prerequisites
 
-- **Node.js** — `22.22.3+` (LTS, pinned in architecture Stack and `.nvmrc`) or `24.15+`.
+- **Node.js** — `26.0.0+` (current LTS pin in `.nvmrc`; architecture Stack target). Older lines `^22.22.3` and `^24.15.0` still satisfy `engines` and work, but `nvm use` installs 26.0.0 for consistency.
   - With nvm-windows or `fnm`, run `nvm use` (reads `.nvmrc`) in this folder.
   - `.npmrc` has `engine-strict=true` — a mismatched Node fails `npm install` loudly rather than warning.
 - **npm** — bundled with Node.
