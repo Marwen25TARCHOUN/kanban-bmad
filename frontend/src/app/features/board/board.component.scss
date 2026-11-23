@@ -1,0 +1,15 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(var(--column-min-width), 1fr));
+  gap: var(--spacing-4);
+  padding: var(--spacing-6);
+  max-width: var(--layout-board-max-width);
+  margin: 0 auto;
+  box-sizing: border-box;
+  align-items: start;
+}

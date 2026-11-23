@@ -1,0 +1,277 @@
+/*
+ * Design tokens — the single source of visual truth.
+ *
+ * Every custom property here mirrors a token declared in DESIGN.md's frontmatter;
+ * component .scss files consume values via var(--token) and never hardcode hex,
+ * px, or rem (see story 3 Verification grep gate).
+ *
+ * Token naming (per story 3 Design Notes):
+ *   DESIGN.md path                -> CSS custom property
+ *   colors.bg-page                -> --bg-page
+ *   colors.priority-high-bg       -> --priority-high-bg
+ *   rounded.card                  -> --rounded-card
+ *   spacing.3                     -> --spacing-3
+ *   shadows.modal                 -> --shadow-modal
+ *   motion.tilt-dragging          -> --motion-tilt-dragging
+ *   target.min-size               -> --target-min-size
+ *   components.Card.shadow-dragging -> --card-shadow-dragging
+ *
+ * Dark-mode dual-track:
+ *   @media (prefers-color-scheme: dark)   — OS default
+ *   :root[data-theme="dark"]              — manual toggle (story 7 wires it)
+ * Both carry the exact same dark values; manual [data-theme] wins by specificity.
+ * If the user sets [data-theme="light"] while OS is dark, the manual choice wins.
+ */
+
+:root {
+  /* ---------- Colors (light theme defaults) ---------- */
+  --bg-page: #FAFAFA;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F4F4F5;
+  --bg-muted: #E4E4E7;
+  --text-primary: #09090B;
+  --text-secondary: #52525B;
+  --text-tertiary: #71717A;
+  --border-default: #E4E4E7;
+  --border-strong: #71717A;
+  --border-focus: #4F46E5;
+
+  /* Accent (indigo) — one brand hue. */
+  --accent-500: #4F46E5;
+  --accent-600: #4338CA;
+  --accent-700: #3730A3;
+  --accent-100: #E0E7FF;
+  --accent-bg: var(--accent-100);
+  --accent-fg: var(--accent-700);
+
+  /* Priority chips — light theme pairings. */
+  --priority-low: #475569;
+  --priority-low-bg: #F1F5F9;
+  --priority-medium: #92400E;
+  --priority-medium-bg: #FEF3C7;
+  --priority-high: #B91C1C;
+  --priority-high-bg: #FEE2E2;
+
+  /* Status (toasts, flashes). */
+  --status-error: #DC2626;
+  --status-error-bg: #FEE2E2;
+  --status-success: #16A34A;
+  --status-success-bg: #DCFCE7;
+
+  /* ---------- Typography ---------- */
+  --sans: system-ui, -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+
+  --size-xs: 0.75rem;
+  --size-sm: 0.875rem;
+  --size-base: 1rem;
+  --size-lg: 1.125rem;
+  --size-xl: 1.25rem;
+  --size-2xl: 1.5rem;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* ---------- Radius ---------- */
+  --rounded-input: 4px;
+  --rounded-button: 6px;
+  --rounded-chip: 6px;
+  --rounded-card: 8px;
+  --rounded-modal: 12px;
+  --rounded-badge: 9999px;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --spacing-0: 0;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 24px;
+  --spacing-6: 32px;
+  --spacing-7: 48px;
+
+  /* ---------- Shadows ---------- */
+  --shadow-modal: 0 20px 40px -8px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+  --shadow-toast: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  --shadow-dragging: 0 8px 16px -4px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+
+  /* ---------- Motion ---------- */
+  --motion-tilt-dragging: 2deg;
+  --motion-opacity-dragging: 0.6;
+  --motion-backdrop-blur: 4px;
+  --motion-drop-indicator-width: 1px;
+  --motion-focus-ring-width: 3px;
+
+  /* ---------- Target size (WCAG 2.5.8 AA) ---------- */
+  --target-min-size: 24px;
+
+  /* ---------- Layout constants (DESIGN.md Layout & Spacing) ---------- */
+  --layout-board-max-width: 1440px;
+  --layout-column-min-height: 240px;
+  --border-width: 1px;
+
+  /* ---------- Component tokens (flattened) ---------- */
+  /* Card */
+  --card-bg: var(--bg-surface);
+  --card-border: var(--border-width) solid var(--border-default);
+  --card-radius: var(--rounded-card);
+  --card-padding: var(--spacing-3);
+  --card-gap: var(--spacing-2);
+  --card-shadow-rest: none;
+  --card-shadow-dragging: var(--shadow-dragging);
+  --card-tilt-dragging: var(--motion-tilt-dragging);
+  --card-opacity-dragging: var(--motion-opacity-dragging);
+
+  /* PriorityChip */
+  --chip-radius: var(--rounded-chip);
+  --chip-padding-y: var(--spacing-2);
+  --chip-padding-x: var(--spacing-2);
+  --chip-min-height: var(--target-min-size);
+
+  /* AIBadge */
+  --ai-badge-radius: var(--rounded-badge);
+  --ai-badge-padding-y: 2px;
+  --ai-badge-padding-x: var(--spacing-1);
+  --ai-badge-bg: var(--accent-100);
+  --ai-badge-fg: var(--accent-700);
+
+  /* Column */
+  --column-bg: var(--bg-subtle);
+  --column-radius: var(--rounded-card);
+  --column-padding: var(--spacing-3);
+  --column-gap: var(--spacing-3);
+  --column-header-gap: var(--spacing-4);
+  --column-min-width: 280px;
+  --column-max-width: 360px;
+  --column-drop-indicator: var(--motion-drop-indicator-width) solid var(--accent-500);
+
+  /* Modal */
+  --modal-bg: var(--bg-surface);
+  --modal-radius: var(--rounded-modal);
+  --modal-padding: var(--spacing-5);
+  --modal-shadow: var(--shadow-modal);
+  --modal-backdrop: rgba(9, 9, 11, 0.5);
+  --modal-backdrop-blur: var(--motion-backdrop-blur);
+  --modal-max-width: 560px;
+
+  /* Toast */
+  --toast-bg: var(--bg-surface);
+  --toast-border: var(--border-width) solid var(--border-default);
+  --toast-radius: var(--rounded-card);
+  --toast-padding: var(--spacing-3);
+  --toast-shadow: var(--shadow-toast);
+
+  /* Input */
+  --input-bg: var(--bg-surface);
+  --input-border: var(--border-width) solid var(--border-strong);
+  --input-border-focus: var(--border-width) solid var(--border-focus);
+  --input-ring-focus: 0 0 0 var(--motion-focus-ring-width) rgba(79, 70, 229, 0.25);
+  --input-radius: var(--rounded-input);
+  --input-padding-y: var(--spacing-2);
+  --input-padding-x: var(--spacing-3);
+  --input-min-height: var(--target-min-size);
+
+  /* IconButton */
+  --icon-button-size: 32px;
+  --icon-button-size-compact: 28px;
+  --icon-button-radius: var(--rounded-button);
+  --icon-button-fg: var(--text-secondary);
+  --icon-button-bg-hover: var(--bg-subtle);
+
+  /* Button-Primary */
+  --button-primary-bg: var(--accent-500);
+  --button-primary-bg-hover: var(--accent-600);
+  --button-primary-bg-active: var(--accent-700);
+  --button-primary-fg: #FFFFFF;
+  --button-primary-radius: var(--rounded-button);
+  --button-primary-padding-y: var(--spacing-2);
+  --button-primary-padding-x: var(--spacing-4);
+  --button-primary-min-height: var(--target-min-size);
+
+  /* Button-Secondary */
+  --button-secondary-bg: transparent;
+  --button-secondary-bg-hover: var(--bg-subtle);
+  --button-secondary-fg: var(--text-primary);
+  --button-secondary-border: var(--border-width) solid var(--border-strong);
+  --button-secondary-radius: var(--rounded-button);
+  --button-secondary-padding-y: var(--spacing-2);
+  --button-secondary-padding-x: var(--spacing-4);
+  --button-secondary-min-height: var(--target-min-size);
+
+  /* SegmentedControl */
+  --segmented-radius: var(--rounded-button);
+  --segmented-item-padding-y: var(--spacing-1);
+  --segmented-item-padding-x: var(--spacing-2);
+  --segmented-item-min-height: var(--target-min-size);
+  --segmented-item-min-width: var(--target-min-size);
+
+  /* Checkbox */
+  --checkbox-visual-size: 16px;
+  --checkbox-touch-size: var(--target-min-size);
+  --checkbox-radius: 4px;
+  --checkbox-border: 1.5px solid var(--border-strong);
+  --checkbox-checked-bg: var(--accent-500);
+  --checkbox-checked-fg: #FFFFFF;
+}
+
+/* ---------- Dark theme (OS preference) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-page: #09090B;
+    --bg-surface: #18181B;
+    --bg-subtle: #27272A;
+    --bg-muted: #3F3F46;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #71717A;
+    --border-default: #3F3F46;
+    --border-strong: #71717A;
+    --border-focus: #818CF8;
+
+    --accent-bg: rgba(99, 102, 241, 0.2);
+    --accent-fg: #A5B4FC;
+
+    --priority-low: #94A3B8;
+    --priority-low-bg: #0F172A;
+    --priority-medium: #FBBF24;
+    --priority-medium-bg: #422006;
+    --priority-high: #F87171;
+    --priority-high-bg: #2C0B0B;
+
+    --ai-badge-bg: rgba(99, 102, 241, 0.2);
+    --ai-badge-fg: #A5B4FC;
+  }
+}
+
+/* ---------- Dark theme (manual toggle — story 7) ---------- */
+:root[data-theme="dark"] {
+  --bg-page: #09090B;
+  --bg-surface: #18181B;
+  --bg-subtle: #27272A;
+  --bg-muted: #3F3F46;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --border-default: #3F3F46;
+  --border-strong: #71717A;
+  --border-focus: #818CF8;
+
+  --accent-bg: rgba(99, 102, 241, 0.2);
+  --accent-fg: #A5B4FC;
+
+  --priority-low: #94A3B8;
+  --priority-low-bg: #0F172A;
+  --priority-medium: #FBBF24;
+  --priority-medium-bg: #422006;
+  --priority-high: #F87171;
+  --priority-high-bg: #2C0B0B;
+
+  --ai-badge-bg: rgba(99, 102, 241, 0.2);
+  --ai-badge-fg: #A5B4FC;
+}

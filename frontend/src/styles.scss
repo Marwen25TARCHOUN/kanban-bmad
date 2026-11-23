@@ -1,0 +1,61 @@
+/*
+ * Global resets and foundation styles.
+ *
+ * Token definitions live in `styles/tokens.css` (wired via angular.json at
+ * index 0 so they load before this file). This file is intentionally small —
+ * component styles consume tokens via var(--name) and own the rest.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: var(--size-base);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+:focus-visible {
+  outline: var(--motion-focus-ring-width) solid var(--border-focus);
+  outline-offset: 2px;
+}
