@@ -2,7 +2,27 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
 
+import { BoardPartitionsResponse } from './models/board-partitions-response';
 import { Card, CardStatus, Priority } from './models/card';
+
+/**
+ * Three-state `PATCH` payload (architecture AD-13).
+ *
+ * Only keys the user intended to change are sent. The server interprets:
+ * - key absent          → field unchanged
+ * - key present (value) → field updated
+ * - key present (`null`) → field cleared (only legal for nullable fields —
+ *   `description`; required fields reject `null` with 400)
+ *
+ * `status` and `position` together describe a move (within or across columns).
+ */
+export interface PatchCardPayload {
+  title?: string;
+  description?: string | null;
+  priority?: Priority;
+  status?: CardStatus;
+  position?: number;
+}
 
 /**
  * Sole {@link HttpClient} consumer (architecture AD-9).
@@ -14,10 +34,8 @@ import { Card, CardStatus, Priority } from './models/card';
  * proxies `/api` to the backend) and dev mode (ng serve + proxy.conf.json)
  * both work without an environment file (see story 3 Design Notes).
  *
- * Only `listCards()` is implemented this story — PATCH / DELETE / batch /
- * create wire in with stories 4 and 6. The stubs surface their "not
- * implemented" error through the Observable error channel (not a sync
- * throw) so future `.subscribe({ error: ... })` callers see it.
+ * Story 4 wires `patchCard` and `deleteCard`. `createCard` and `batchCards`
+ * remain stubs until story 6 ships the AI breakdown accept flow.
  */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -27,21 +45,40 @@ export class ApiService {
     return this.http.get<Card[]>('/api/cards');
   }
 
-  /* -- Stubs: implementation deferred to stories 4 and 6 -- */
-
-  patchCard(_id: string, _patch: Partial<Card>): Observable<unknown> {
-    return throwError(() => new Error('ApiService.patchCard: not implemented in story 3 (wires in story 4)'));
+  /**
+   * Partial-update one card. Body carries only the keys that changed; the
+   * server echoes the affected partition(s) renumbered `0..n-1`
+   * (AD-4, AD-13, story 2 Decision B1). `encodeURIComponent` is structural
+   * correctness — UUIDs don't need it today but a future id format (slug,
+   * ULID with reserved chars) won't silently 404.
+   */
+  patchCard(id: string, patch: PatchCardPayload): Observable<BoardPartitionsResponse> {
+    return this.http.patch<BoardPartitionsResponse>(
+      `/api/cards/${encodeURIComponent(id)}`,
+      patch,
+    );
   }
 
-  deleteCard(_id: string): Observable<void> {
-    return throwError(() => new Error('ApiService.deleteCard: not implemented in story 3 (wires in story 4)'));
+  /**
+   * Delete one card. The server returns 204 No Content and renumbers the
+   * remaining cards in the affected status partition server-side (AD-4).
+   */
+  deleteCard(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/cards/${encodeURIComponent(id)}`);
   }
 
-  createCard(_payload: { title: string; description?: string; priority?: Priority; status?: CardStatus }): Observable<Card> {
-    return throwError(() => new Error('ApiService.createCard: not implemented in story 3 (wires in story 4)'));
+  /* -- Stubs: implementation deferred to story 6 (AI breakdown + manual create). -- */
+
+  createCard(_payload: {
+    title: string;
+    description?: string;
+    priority?: Priority;
+    status?: CardStatus;
+  }): Observable<Card> {
+    return throwError(() => new Error('ApiService.createCard: not implemented (wires in story 6)'));
   }
 
   batchCards(_payload: unknown): Observable<Card[]> {
-    return throwError(() => new Error('ApiService.batchCards: not implemented in story 3 (wires in story 6)'));
+    return throwError(() => new Error('ApiService.batchCards: not implemented (wires in story 6)'));
   }
 }

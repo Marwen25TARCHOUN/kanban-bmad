@@ -44,9 +44,21 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  flex: 1 1 auto;
+  min-height: var(--target-min-size);
 }
 
-.column-item {
+// CDK adds `.cdk-drop-list-dragging` to the active drop container.
+// Draw a top + bottom accent rule to signal "drop zone active"
+// (EXPERIENCE.md Dragging state → column drop-indicator).
+.column-body.cdk-drop-list-dragging,
+.column-body.cdk-drop-list-receiving {
+  border-top: var(--column-drop-indicator);
+  border-bottom: var(--column-drop-indicator);
+}
+
+.column-item,
+.column-empty-item {
   display: block;
 }
 

@@ -9,12 +9,14 @@
   min-height: var(--chip-min-height);
   min-width: var(--chip-min-height);
   padding: var(--chip-padding-y) var(--chip-padding-x);
+  border: none;
   border-radius: var(--chip-radius);
   font-family: var(--sans);
   font-size: var(--size-xs);
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
   letter-spacing: 0.01em;
+  cursor: pointer;
 }
 
 .chip-label {
