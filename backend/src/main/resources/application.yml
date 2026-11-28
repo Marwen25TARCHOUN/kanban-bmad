@@ -6,6 +6,20 @@
 server:
   port: 8080
 
+# Anthropic API key — story 5 (CAP-2 / AD-6). Uncomment the placeholder below and export
+# `ANTHROPIC_API_KEY` for local dev without Docker; Spring's relaxed binding picks the env var
+# up at this property path. The AI bean graph (`AnthropicRestClientConfig`, `AiBreakdownService`,
+# `AiBreakdownController`, `AiBreakdownValidator`) only loads when this property resolves to a
+# non-blank string — bean absence IS the CAP-7 graceful-degradation signal `GET /api/config`
+# reports.
+#
+# Patch A (review pass 1): do NOT use the `:` colon default here (e.g. `${ANTHROPIC_API_KEY:}`).
+# A colon default resolves an unset env var to the empty string, and the SpEL condition on the
+# bean graph (`'${anthropic.api-key:}'.trim() != ''`) will still reject it, so the end state is
+# honest — but the yml line itself should omit the trap so no future reader "fixes" the
+# resolution and reintroduces the empty-string bean-graph load.
+# anthropic.api-key: ${ANTHROPIC_API_KEY}
+
 spring:
   application:
     name: kanban
