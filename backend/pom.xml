@@ -50,6 +50,20 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!--
+          Story 5 (AD-5 revised): Spring Boot 4.1 split the client-side HTTP machinery out of
+          `spring-boot-starter-web` into a dedicated `spring-boot-starter-restclient`. It carries
+          `spring-boot-http-client` which auto-configures `RestClient.Builder` with the Jackson 3
+          message converters already in the context, and ships `ClientHttpRequestFactorySettings`
+          for the per-call timeout wiring in `AnthropicRestClientConfig`. No WebClient / reactor /
+          Anthropic-SDK deps — the single-shot direct call in `AiBreakdownService` is enough for
+          the MVP (NFR-2 10 s p95, no retry per AD-5).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -91,6 +105,19 @@
             <artifactId>spring-boot-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!--
+          Patch D / I (review pass 1): `TestRestTemplate` moved in Spring Boot 4 from
+          `org.springframework.boot.test.web.client` to `org.springframework.boot.resttestclient`,
+          and the classes live in a new `spring-boot-resttestclient` module that isn't pulled in
+          transitively. Needed for the `@SpringBootTest` integration tests that assert the
+          CAP-7 404 contract and the aiEnabled-honesty invariant (patches F / A / I).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-resttestclient</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -107,6 +134,38 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+
+            <!--
+              Patch AA (review pass 1): fail the build if anyone pulls in WebClient / webflux
+              or a retry library. AD-5 pins "RestClient only, no retry"; a CI-gated bannedDependencies
+              rule turns a manual dependency-tree grep into a build-time guarantee.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>ban-webflux-and-retry</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>org.springframework.boot:spring-boot-starter-webflux</exclude>
+                                        <exclude>org.springframework:spring-webflux</exclude>
+                                        <exclude>io.github.resilience4j:*</exclude>
+                                        <exclude>org.springframework.retry:*</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

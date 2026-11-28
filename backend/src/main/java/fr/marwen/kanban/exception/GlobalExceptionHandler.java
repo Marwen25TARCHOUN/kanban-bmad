@@ -18,6 +18,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Single error translator (architecture AD-2).
@@ -38,6 +40,7 @@ public class GlobalExceptionHandler {
     static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     static final String NOT_FOUND = "NOT_FOUND";
     static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    static final String AI_UNAVAILABLE = "AI_UNAVAILABLE";
 
     /**
      * Localized microcopy for the generic fallbacks. Keys that miss fall back through
@@ -48,12 +51,14 @@ public class GlobalExceptionHandler {
                     "validation.failed", "Validation failed",
                     "validation.invalidFormat", "invalid format",
                     "notFound", "Resource not found",
-                    "internalError", "Something went wrong"),
+                    "internalError", "Something went wrong",
+                    "error.ai.unavailable", "AI service unavailable, try again"),
             "fr", Map.of(
                     "validation.failed", "Validation échouée",
                     "validation.invalidFormat", "format invalide",
                     "notFound", "Ressource introuvable",
-                    "internalError", "Une erreur est survenue"));
+                    "internalError", "Une erreur est survenue",
+                    "error.ai.unavailable", "Service IA indisponible, réessayez"));
 
     /**
      * Translations for the Jakarta annotation default messages. Keyed on the EN default so an
@@ -66,7 +71,9 @@ public class GlobalExceptionHandler {
             "must not be null", "ne doit pas être nul",
             "must not be empty", "ne doit pas être vide",
             "must be true", "doit être vrai",
-            "must be false", "doit être faux");
+            "must be false", "doit être faux",
+            // Patch O: BreakdownRequest @Pattern custom message for the `\p{Cntrl}` reject.
+            "must not contain control characters", "ne doit pas contenir de caractères de contrôle");
 
     private static final Pattern SIZE_PATTERN =
             Pattern.compile("size must be between (\\d+) and (\\d+)");
@@ -139,6 +146,41 @@ public class GlobalExceptionHandler {
         log.debug("entity not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(NOT_FOUND, microcopy("notFound")));
+    }
+
+    /**
+     * Patch I (review pass 1): an unknown path in Spring MVC 7 raises either
+     * {@link NoHandlerFoundException} (when no mapping matches) or {@link NoResourceFoundException}
+     * (Spring 7 default — the dispatcher falls through to the static resource handler which
+     * throws this). Both route to 404 so CAP-7's "AI disabled => 404" contract holds and the
+     * catch-all {@link #handleAny(Exception)} below doesn't turn them into 500.
+     */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNoHandler(Exception ex) {
+        log.debug("no handler: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(NOT_FOUND, microcopy("notFound")));
+    }
+
+    // ---------------------------------------------------------------------- 503
+
+    /**
+     * Story 5 — every post-call AI failure lands here: Anthropic timeout, non-2xx, non-JSON,
+     * missing envelope path, validator rejection. The WARN log captures the original cause so
+     * a reviewer can trace the inconsistency; the wire message stays the localized generic
+     * string so no upstream detail (including the API key, if it were ever in a trace) leaks.
+     */
+    @ExceptionHandler(AiUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAiUnavailable(AiUnavailableException ex) {
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            log.warn("AI unavailable: {} - caused by {}: {}",
+                    ex.getMessage(), cause.getClass().getSimpleName(), cause.getMessage());
+        } else {
+            log.warn("AI unavailable: {}", ex.getMessage());
+        }
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse(AI_UNAVAILABLE, microcopy("error.ai.unavailable")));
     }
 
     // ---------------------------------------------------------------------- 500
